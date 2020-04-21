@@ -1,7 +1,8 @@
+#include <SoftPWM_timer.h>
+#include <SoftPWM.h>
+
 #include <SD.h>
 #include <LiquidCrystal.h>
-#include <SoftPWM.h>
-#include <AltSoftSerial.h>
 #include "lcd.h"
 #include "weigand.h"
 
@@ -20,12 +21,101 @@
 
 #define SD_CS 10
 
-AltSoftSerial BLEMini; 
+//AltSoftSerial BLEMini;
+
+extern uint8_t* __brkval;
+extern uint8_t __heap_start;
+int freeRam () {
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
 
 Weigand w(RFID_D0, RFID_D1);
 LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 boolean startupError = false;
+
+
+
+void setLCDColor(lcdstatus s) {
+  switch(s) {
+  case error: 
+    lcdWriteColor(0xff, 0x00, 0x00);
+    break;   
+  case warning: 
+    lcdWriteColor(0xff, 0x22, 0x00);
+    break;    
+  case info: 
+    lcdWriteColor(0x00, 0xff, 0xff);
+    break;    
+  case green:
+    lcdWriteColor(0x00, 0xff, 0x00);
+    break;
+  default: 
+    lcdWriteColor(0xff, 0xff, 0xff);
+  }
+}
+
+void lcdRainbow() {
+  unsigned int rgbColor[3];
+   
+  // Start off with red.
+  rgbColor[0] = 255;
+  rgbColor[1] = 0;
+  rgbColor[2] = 0;
+   
+  // Choose the colours to increment and decrement.
+  for (int decColor = 0; decColor < 3; decColor += 1) {
+    int incColor = decColor == 2 ? 0 : decColor + 1;
+     
+    // cross-fade the two colours.
+    for(int i = 0; i < 255; i += 1) {
+      rgbColor[decColor] -= 1;
+      rgbColor[incColor] += 1;
+      SoftPWMSet(LCD_RED, rgbColor[0]); 
+      SoftPWMSet(LCD_GREEN, rgbColor[1]);
+      SoftPWMSet(LCD_BLUE, rgbColor[2]);
+      delay(5);
+    }
+  }
+}
+
+
+void lcdWriteColor(int r, int g, int b) {
+  SoftPWMSet(LCD_RED, map(r, 0, 255, 255, 0)); 
+  SoftPWMSet(LCD_GREEN, map(g, 0, 255, 255, 0));
+  SoftPWMSet(LCD_BLUE, map(b, 0, 255, 255, 0));
+}
+
+void lcdWriteLine1(char text[]) {
+  lcd.setCursor(0, 0);
+  lcd.print(text); 
+}
+
+void lcdWriteLine2(char text[]) {
+  lcd.setCursor(0, 1);
+  lcd.print(text); 
+}
+
+void lcdWriteCard(unsigned int bits, uint64_t card) {
+  lcdClear();
+  
+  lcd.setCursor(0, 0); 
+  lcd.print(F("Size: "));
+  lcd.print(bits);
+  
+  lcd.setCursor(0, 1);
+  lcd.print(card, HEX);
+}
+
+void lcdClear() {
+  lcd.clear(); 
+}
+
+
+
+
+
 
 void readD0() {
   w.add0();
@@ -76,7 +166,20 @@ void loop() {
   if(w.loop()) {
      Serial.println("");
      setLCDColor(green);
+     uint64_t card = w.parsecard();
      lcdWriteCard(w.getcount(), w.parsecard());
+
+    
+    Serial.print("[*] Got data: '");
+    Serial.print(w.getcount());
+    Serial.print(",");
+    Serial.print(card, BIN);
+    Serial.print(",");
+    Serial.print(card, HEX);
+    Serial.println("'");
+
+     delay(3000);
+     
      sdWriteCard();
      sendBluetooth();
 
@@ -121,21 +224,16 @@ void sdWriteCard() {
 
 void sendBluetooth() {
   uint64_t card = w.parsecard();
-  if (BLEMini.available()) {
-    char buf[128];
-    sprintf(buf, "%llu", (unsigned long long) card);	
-    int len = strlen(buf);
+  //if (BLEMini.available()) {
+  //  char buf[128];
+  //  sprintf(buf, "%llu", (unsigned long long) card);	
+  //  int len = strlen(buf);
 
-    BLEMini.write();
-    for (int i = 0; i < len; i++) {
-      BLEMini.write(buf[i]);
-    }
+   // BLEMini.write();
+   // for (int i = 0; i < len; i++) {
+   //   BLEMini.write(buf[i]);
+   // }
   }
-}
 
-extern uint8_t* __brkval;
-extern uint8_t __heap_start;
-int freeRam () {
-  int v;
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
-}
+
+ 

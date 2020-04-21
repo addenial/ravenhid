@@ -1,0 +1,5 @@
+#need to use updated print libraries in arduino to display 64bit string
+#copy into the following directories:
+
+/home/user/Desktop/arduino-1.8.12/hardware/arduino/avr/cores/arduino/Print.h
+/home/user/Desktop/arduino-1.8.12/hardware/arduino/avr/cores/arduino/Print.cpp
